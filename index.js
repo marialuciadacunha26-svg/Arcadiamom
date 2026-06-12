@@ -1,32 +1,29 @@
 const { 
   Client, 
   GatewayIntentBits, 
-  Partials, 
-  PermissionsBitField, 
   ActionRowBuilder, 
   ButtonBuilder, 
   ButtonStyle, 
   ChannelType,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  REST,
+  Routes,
+  SlashCommandBuilder,
+  PermissionsBitField
 } = require("discord.js");
 const express = require("express");
 const fs = require("fs");
 
 // Servidor Web para o Render
-const app = express();
-app.get("/", (req, res) => res.send("Arcadiamon V3 - Sistema Corrigido!"));
+const app = report => express();
+app.get("/", (req, res) => res.send("Arcadiamon V3 Slash Ativo!"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
-  // Ativando todas as permissões de leitura no código
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers // Necessário para ler quem é Admin
-  ],
-  // Partials garantem que o bot leia mensagens antigas ou novas sem bugar
-  partials: [Partials.Channel, Partials.Message, Partials.User]
+    GatewayIntentBits.GuildMessages
+  ]
 });
 
 // 📁 BANCO DE DADOS APENAS PARA O INVENTÁRIO
@@ -38,25 +35,52 @@ if (fs.existsSync(DATA_FILE)) {
 }
 function saveDB() { fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2)); }
 
-client.on("ready", () => { 
-  console.log(`🤖 Bot logado como ${client.user.tag}! Pronto para receber comandos.`); 
+// ================= REGISTRO DOS COMANDOS DE BARRA (SLASH) =================
+const commands = [
+  new SlashCommandBuilder()
+    .setName("setup-ticket")
+    .setDescription("Envia o painel de criação de tickets no canal.")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
+  new SlashCommandBuilder()
+    .setName("status")
+    .setDescription("Mostra as informações e status do servidor de Minecraft.")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator), // Apenas Admins para evitar spam
+
+  new SlashCommandBuilder()
+    .setName("pegar")
+    .setDescription("Adiciona um item ou Pokémon ao seu inventário.")
+    .addStringOption(option => 
+      option.setName("item")
+        .setDescription("Nome do item ou Pokémon")
+        .setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("inv")
+    .setDescription("Mostra o seu inventário de itens.")
+].map(command => command.toJSON());
+
+client.on("ready", async () => {
+  console.log(`🤖 Bot logado como ${client.user.tag}!`);
+
+  const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
+  try {
+    console.log("Registrando comandos de barra (/)...");
+    await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
+    console.log("Todos os comandos (/) foram registrados!");
+  } catch (error) {
+    console.error("Erro ao registrar comandos:", error);
+  }
 });
 
-// ================= COMANDOS =================
-client.on("messageCreate", async (message) => {
-  // Ignora se for bot ou se a mensagem não tiver conteúdo
-  if (message.author.bot || !message.content) return;
+// ================= PROCESSANDO OS SLASH COMMANDS =================
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
 
-  const args = message.content.trim().split(/ +/);
-  const cmd = args[0].toLowerCase(); // Deixa em minúsculo para evitar erro se digitar !Setup-Ticket
+  const { commandName } = interaction;
 
-  // 🎫 ENVIAR PAINEL DE TICKET
-  if (cmd === "!setup-ticket") {
-    // Verificação reforçada de Administrador
-    if (!message.member || !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return message.reply("❌ Apenas administradores podem usar este comando.");
-    }
-
+  // 🎫 /setup-ticket
+  if (commandName === "setup-ticket") {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId("open_ticket")
@@ -64,34 +88,60 @@ client.on("messageCreate", async (message) => {
         .setStyle(ButtonStyle.Primary)
     );
 
-    await message.channel.send({
+    await interaction.reply({
       content: "## 🎫 Central de Atendimento Arcadiamon\nPrecisa de ajuda ou suporte? Clique no botão abaixo para abrir um ticket privado.",
       components: [row]
-    }).then(() => {
-      // Deleta a mensagem do comando para o chat ficar limpo
-      message.delete().catch(() => {});
-    }).catch(err => {
-      console.error("Erro ao enviar o painel:", err);
     });
   }
 
-  // 🎒 INVENTÁRIO
-  if (cmd === "!pegar") {
-    let item = args.slice(1).join(" ");
-    if (!item) return message.reply("Digite o nome do item para pegar!");
-    if (!db.inventory[message.author.id]) db.inventory[message.author.id] = [];
-    db.inventory[message.author.id].push(item);
-    saveDB();
-    message.reply("Você pegou: " + item);
+  // 🎮 /status (COMANDO NOVO PARA O SEU MINECRAFT)
+  if (commandName === "status") {
+    const timestampAtual = Math.floor(Date.now() / 1000);
+    
+    const msgMinecraft = 
+`## 🎮 Arcadiamon
+*Servidor Minecraft Bedrock*
+
+**📡 Status:** 🟢 Online
+## 👥 Jogadores
+\`▰▱▱▱▱▱▱▱▱▱\`  **7 / 50**
+## 📋 Informações
+**📦 Versão:** \`1.26.20\` (protocol 975)
+**🎯 Gamemode:** \`Sobrevivência\`
+**🖥️ Edição:** \`Bedrock (MCPE)\`
+## 🔗 Como Conectar
+> ╔════════════════════════════════╗
+> ☣️🔥  ARCADIAMON. LUTE, CONQUISTE, SE TORNE UMA LENDA 🔥☣️
+> ╚════════════════════════════════╝
+> 
+> 1️⃣  Abra o **Minecraft Bedrock**
+> 2️⃣  Vá em **Jogar → Servidores → Adicionar Servidor**
+> 3️⃣  **IP:** \`arcadiamon.blazebr.xyz\`
+> 4️⃣  **Porta:** \`28606\`
+-# Verificado em <t:${timestampAtual}:f> • Powered by mcstatus.io`;
+
+    await interaction.reply({ content: msgMinecraft });
   }
 
-  if (cmd === "!inv") {
-    let inv = db.inventory[message.author.id] || [];
-    message.reply("Inventário: " + (inv.join(", ") || "vazio"));
+  // 🎒 /pegar
+  if (commandName === "pegar") {
+    const item = interaction.options.getString("item");
+    if (!db.inventory[interaction.user.id]) db.inventory[interaction.user.id] = [];
+    
+    db.inventory[interaction.user.id].push(item);
+    saveDB();
+
+    await interaction.reply({ content: `Você guardou **${item}** no seu inventário! 🎒` });
+  }
+
+  // 🎒 /inv
+  if (commandName === "inv") {
+    let inv = db.inventory[interaction.user.id] || [];
+    await interaction.reply({ content: "🎒 **Seu Inventário:** " + (inv.join(", ") || "vazio") });
   }
 });
 
-// ================= INTERAÇÕES DOS BOTÕES =================
+// ================= INTERAÇÕES DOS BOTÕES INTERNOS =================
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
 
@@ -116,28 +166,28 @@ client.on("interactionCreate", async (interaction) => {
       );
 
       await channel.send({
-        content: `👋 Olá ${interaction.user}, bem-vindo ao seu ticket!\nExplique sua dúvida aqui. A equipe de suporte já foi notificada.`,
+        content: `👋 Olá ${interaction.user}, bem-vindo ao seu ticket!\nExplique sua dúvida aqui. Nossa equipe de suporte já foi avisada.`,
         components: [rowTicket]
       });
 
-      await interaction.editReply({ content: `Seu ticket foi criado com sucesso em: ${channel}` });
+      await interaction.editReply({ content: `Seu ticket foi criado: ${channel}` });
     } catch (error) {
       console.error(error);
-      await interaction.editReply({ content: "❌ Ocorreu um erro ao criar o canal do ticket. Verifique minhas permissões no servidor." });
+      await interaction.editReply({ content: "❌ Não consegui criar o canal do ticket. Verifique se tenho permissão de 'Gerenciar Canais'." });
     }
   }
 
   // 2️⃣ CLICOU EM CLAIM (ASSUMIR)
   if (interaction.customId === "claim_ticket") {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-      return interaction.reply({ content: "Apenas a Staff pode assumir este ticket!", ephemeral: true });
+      return interaction.reply({ content: "Apenas membros da Staff podem assumir este ticket!", ephemeral: true });
     }
-    await interaction.reply({ content: `🚨 O moderador ${interaction.user} assumiu o atendimento deste ticket!` });
+    await interaction.reply({ content: `🚨 O moderador ${interaction.user} assumiu este ticket!` });
   }
 
   // 3️⃣ CLICOU EM FECHAR TICKET
   if (interaction.customId === "close_ticket") {
-    await interaction.reply("🔒 Fechando o ticket em 5 segundos...");
+    await interaction.reply("🔒 Fechando este canal em 5 segundos...");
     setTimeout(() => {
       interaction.channel.delete().catch(() => {});
     }, 5000);
@@ -146,7 +196,7 @@ client.on("interactionCreate", async (interaction) => {
   // 4️⃣ CLICOU NO PAINEL STAFF
   if (interaction.customId === "staff_panel") {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-      return interaction.reply({ content: "❌ Erro: Esse painel é restrito para membros da Staff.", ephemeral: true });
+      return interaction.reply({ content: "❌ Apenas a Staff pode abrir este painel.", ephemeral: true });
     }
 
     const rowStaff = new ActionRowBuilder().addComponents(
@@ -155,7 +205,7 @@ client.on("interactionCreate", async (interaction) => {
     );
 
     await interaction.reply({
-      content: "🛠️ **Painel de Controle Staff (Secreto)**\nUse as funções abaixo para gerenciar este canal de atendimento:",
+      content: "🛠️ **Painel de Controle Staff (Secreto)**\nGerencie o atendimento usando os botões abaixo:",
       components: [rowStaff],
       ephemeral: true
     });
@@ -164,7 +214,7 @@ client.on("interactionCreate", async (interaction) => {
   // 5️⃣ CLICOU EM ADICIONAR USUÁRIO
   if (interaction.customId === "staff_add_user") {
     await interaction.reply({ 
-      content: "💡 Para adicionar alguém, digite no chat deste ticket:\n`!adicionar @usuario`", 
+      content: "💡 Para adicionar alguém neste canal de ticket, use o comando de chat:\n`!adicionar @usuario`", 
       ephemeral: true 
     });
   }
@@ -172,16 +222,16 @@ client.on("interactionCreate", async (interaction) => {
   // 6️⃣ CLICOU EM RENOMEAR CANAL
   if (interaction.customId === "staff_renomear") {
     await interaction.channel.setName(`resolvido-${interaction.channel.name.split("-")[1] || ""}`);
-    await interaction.reply({ content: "✅ Canal marcado como resolvido!", ephemeral: true });
+    await interaction.reply({ content: "✅ Nome do canal alterado para resolvido!", ephemeral: true });
   }
 });
 
-// Comando para a staff adicionar membros ao ticket aberto
+// Comando auxiliar !adicionar
 client.on("messageCreate", async (message) => {
   if (message.content.startsWith("!adicionar")) {
     if (!message.member || !message.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) return;
     const user = message.mentions.users.first();
-    if (!user) return message.reply("Mencione um usuário válido para adicionar.");
+    if (!user) return message.reply("Mencione o usuário que você quer adicionar.");
 
     await message.channel.permissionOverwrites.create(user.id, {
       ViewChannel: true,
