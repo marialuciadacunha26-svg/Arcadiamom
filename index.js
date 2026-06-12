@@ -14,10 +14,10 @@ const {
 const express = require("express");
 const fs = require("fs");
 
-// Servidor Web para o Render
-const app = report => express();
+// Servidor Web para o Render (Corrigido para o Docker)
+const app = express();
 app.get("/", (req, res) => res.send("Arcadiamon V3 Slash Ativo!"));
-app.listen(process.env.PORT || 3000);
+app.listen(process.env.PORT || 3000, () => console.log("Web server pronto para o Docker."));
 
 const client = new Client({
   intents: [
@@ -45,7 +45,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName("status")
     .setDescription("Mostra as informações e status do servidor de Minecraft.")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator), // Apenas Admins para evitar spam
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName("pegar")
@@ -94,7 +94,7 @@ client.on("interactionCreate", async (interaction) => {
     });
   }
 
-  // 🎮 /status (COMANDO NOVO PARA O SEU MINECRAFT)
+  // 🎮 /status
   if (commandName === "status") {
     const timestampAtual = Math.floor(Date.now() / 1000);
     
