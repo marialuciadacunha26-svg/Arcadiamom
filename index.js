@@ -55,7 +55,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("pegar")
-    .setDescription("Adiciona um item ou Pokémon ao seu inventário.")
+    .setDescription("Adiciona um item ou Pokémon ao seu inventário do Discord.")
     .addStringOption(option => 
       option.setName("item")
         .setDescription("Nome do item ou Pokémon")
@@ -63,7 +63,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("inv")
-    .setDescription("Mostra o seu inventário de itens.")
+    .setDescription("Mostra o seu inventário de itens do Discord.")
 ].map(command => command.toJSON());
 
 client.on("ready", async () => {
@@ -164,7 +164,7 @@ client.on("interactionCreate", async (interaction) => {
     saveDB();
 
     const embedPegar = new EmbedBuilder()
-      .setDescription(`🎒 Guardado com sucesso! Você adicionou **${item}** no seu inventário.`)
+      .setDescription(`🎒 Guardado com sucesso! Você adicionou **${item}** no seu inventário do Discord.`)
       .setColor("#00ff00");
 
     await interaction.reply({ embeds: [embedPegar] });
@@ -316,36 +316,44 @@ client.on("messageCreate", async (message) => {
     await message.channel.sendTyping();
 
     const pergunta = message.content.toLowerCase();
-    let respostaTexto = `Olá! Eu sou a inteligência artificial do Arcadiamon. Como este é um canal de suporte automático, descreva sua dúvida detalhadamente ou use os botões acima para chamar um Moderador humano!`;
+    let respostaTexto = `Olá! Eu sou a inteligência artificial de suporte da **Arcadiamon**. \n\nDescreva sua dúvida detalhadamente neste chat. Se precisar de um atendente humano, basta aguardar que a nossa equipe da Staff já foi notificada através dos botões acima!`;
 
-    // 1️⃣ Dúvida de Como Entrar / Conectar
+    // 1️⃣ COMO ENTRAR NO SERVIDOR (PADRÃO GAMEZONE)
     if (pergunta.includes("ip") || pergunta.includes("porta") || pergunta.includes("conectar") || pergunta.includes("entrar") || pergunta.includes("como entra")) {
-      respostaTexto = `🎮 **Como Entrar no Arcadiamon (Minecraft Bedrock/MCPE):**\n\n` +
-                      `1️⃣ Abra o seu Minecraft.\n` +
-                      `2️⃣ Vá em **Jogar** ➔ **Servidores** ➔ Clique em **Adicionar Servidor**.\n` +
-                      `3️⃣ Preencha com os dados abaixo:\n` +
-                      `• 📌 **IP / Endereço:** \`arcadiamon.blazebr.xyz\`\n` +
+      respostaTexto = `📡 **CENTRAL DE CONEXÃO | ARCADIAMON**\n\n` +
+                      `Para se conectar ao nosso servidor de Minecraft Bedrock (Celular/Console/PC), siga o passo a passo abaixo:\n\n` +
+                      `1️⃣ Inicie o seu **Minecraft Bedrock**.\n` +
+                      `2️⃣ Clique em **Jogar** ➔ Aba **Servidores** ➔ **Adicionar Servidor**.\n` +
+                      `3️⃣ Insira os seguintes dados de conexão:\n\n` +
+                      `• 🌐 **IP / Endereço:** \`arcadiamon.blazebr.xyz\`\n` +
                       `• 🔌 **Porta:** \`28606\`\n\n` +
-                      `Salve e clique em entrar para começar sua jornada Pokémon!`;
+                      `4️⃣ Clique em **Salvar** e depois em **Entrar**. Pronto, você já estará no mundo Pokémon!`;
     
-    // 2️⃣ Dúvida de Como Pegar as Coisas do Mod (Pokémons e Itens)
-    } else if (pergunta.includes("pegar") || pergunta.includes("mod") || pergunta.includes("pixelmon") || pergunta.includes("pokemon") || pergunta.includes("item") || pergunta.includes("como ganha") || pergunta.includes("pega")) {
-      respostaTexto = `🎒 **Como pegar itens e Pokémons do Mod:**\n\n` +
-                      `Você pode adicionar itens ou Pokémons diretamente ao seu inventário usando nosso comando de barra aqui no Discord!\n\n` +
-                      `👉 Use o comando: \`/pegar\`\n` +
-                      `• Depois digite o nome do Pokémon ou item que deseja coletar.\n\n` +
-                      `Para ver tudo o que você já coletou, use o comando: \`/inv\``;
+    // 2️⃣ COMO PEGAR AS COISAS DO MOD / POKEPEDIA DENTRO DO JOGO (PADRÃO GAMEZONE)
+    } else if (pergunta.includes("pegar") || pergunta.includes("mod") || pergunta.includes("pixelmon") || pergunta.includes("pokemon") || pergunta.includes("item") || pergunta.includes("como ganha") || pergunta.includes("pega") || pergunta.includes("pokepedia") || pergunta.includes("pokedex")) {
+      respostaTexto = `🎮 **GUIA DE INÍCIO | COMO PEGAR ITENS E USAR A POKÉPEDIA**\n\n` +
+                      `No Arcadiamon, toda a sua jornada acontece diretamente dentro do servidor do Minecraft. Veja como resgatar seus itens e consultar a Poképédia:\n\n` +
+                      `• 🧬 **Seu Primeiro Pokémon:** Assim que você entrar no servidor pela primeira vez, uma interface será aberta automaticamente na sua tela para você escolher o seu Pokémon Inicial.\n\n` +
+                      `• 📦 **Kits Iniciais (Pokébolas e Itens):** Abra o chat do jogo dentro do servidor e digite o comando:\n` +
+                      `  ➔ \`/kit\` ou \`/kit inicial\`\n` +
+                      `  *(Isso vai colocar as suas primeiras Pokébolas e ferramentas direto no seu inventário do jogo).* \n\n` +
+                      `• 📖 **Acessar a Poképédia / Pokédex:** Para consultar informações de qualquer Pokémon, golpes, evoluções e fraquezas dentro do jogo, abra o chat do Minecraft e digite:\n` +
+                      `  ➔ \`/pokepedia\` ou \`/pokedex\`\n` +
+                      `  *(Um menu interativo será aberto na sua tela com a lista completa de dados de todas as criaturas do mod).* \n\n` +
+                      `• 🌲 **Capturando no Mapa:** Para pegar novos Pokémons, basta andar pelo mundo selvagem, encontrar o Pokémon que você quer e arremessar a sua Pokébola nele para iniciar a captura.\n\n` +
+                      `⚠️ *Nota: Se você comprou algum pacote, VIP ou Pokémon na Loja e veio aqui resgatar, informe o seu Nick do jogo neste chat e aguarde um Diretor/Admin realizar a entrega manual.*`;
                       
     } else if (pergunta.includes("vip") || pergunta.includes("comprar") || pergunta.includes("loja") || pergunta.includes("kit")) {
-      respostaTexto = `Para adquirir vantagens VIP, kits exclusivos ou Pokémons customizados, aguarde o suporte de um administrador da nossa equipe neste canal ou acesse nossa loja!`;
+      respostaTexto = `🛒 **LOJA E VANTAGENS VIP**\n\nPara adquirir vantagens VIP, kits exclusivos, insígnias ou Pokémons customizados, aguarde o suporte de um administrador da nossa equipe neste canal ou consulte as instruções na nossa categoria de anúncios!`;
     } else if (pergunta.includes("ajuda") || pergunta.includes("bug") || pergunta.includes("erro")) {
-      respostaTexto = `Lamento pelo inconveniente! Por favor detalhe o bug ou problema enviando provas e imagens se possível neste chat para que a nossa moderação analise.`;
+      respostaTexto = `🔺 **REPORTE DE ERROS E BUGS**\n\nLamentamos pelo transtorno! Para que nossa equipe técnica resolva o seu problema o quanto antes, envie neste chat:\n\n1️⃣ Seu Nick no jogo.\n2️⃣ Uma breve explicação do bug.\n3️⃣ Prints ou vídeos do erro acontecendo (se houver).`;
     }
 
     const embedIa = new EmbedBuilder()
       .setTitle("🤖 Suporte Automatizado Arcadiamon")
       .setDescription(respostaTexto)
-      .setColor("#9b59b6");
+      .setColor("#ffcc00")
+      .setFooter({ text: "Arcadiamon • Sistema de Respostas Rápidas" });
 
     await message.reply({ embeds: [embedIa] });
   }
