@@ -14,16 +14,19 @@ const fs = require("fs");
 
 // Servidor Web para o Render
 const app = express();
-app.get("/", (req, res) => res.send("Arcadiamon V3 - Tickets Ativos!"));
+app.get("/", (req, res) => res.send("Arcadiamon V3 - Sistema Corrigido!"));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({
+  // Ativando todas as permissões de leitura no código
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers // Necessário para ler quem é Admin
   ],
-  partials: [Partials.Channel]
+  // Partials garantem que o bot leia mensagens antigas ou novas sem bugar
+  partials: [Partials.Channel, Partials.Message, Partials.User]
 });
 
 // 📁 BANCO DE DADOS APENAS PARA O INVENTÁRIO
@@ -35,17 +38,24 @@ if (fs.existsSync(DATA_FILE)) {
 }
 function saveDB() { fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2)); }
 
-client.on("ready", () => { console.log("Arcadiamon V3 online (Sem Moedas)!"); });
+client.on("ready", () => { 
+  console.log(`🤖 Bot logado como ${client.user.tag}! Pronto para receber comandos.`); 
+});
 
 // ================= COMANDOS =================
 client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-  const args = message.content.split(" ");
-  const cmd = args[0];
+  // Ignora se for bot ou se a mensagem não tiver conteúdo
+  if (message.author.bot || !message.content) return;
+
+  const args = message.content.trim().split(/ +/);
+  const cmd = args[0].toLowerCase(); // Deixa em minúsculo para evitar erro se digitar !Setup-Ticket
 
   // 🎫 ENVIAR PAINEL DE TICKET
   if (cmd === "!setup-ticket") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
+    // Verificação reforçada de Administrador
+    if (!message.member || !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+      return message.reply("❌ Apenas administradores podem usar este comando.");
+    }
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -57,10 +67,15 @@ client.on("messageCreate", async (message) => {
     await message.channel.send({
       content: "## 🎫 Central de Atendimento Arcadiamon\nPrecisa de ajuda ou suporte? Clique no botão abaixo para abrir um ticket privado.",
       components: [row]
+    }).then(() => {
+      // Deleta a mensagem do comando para o chat ficar limpo
+      message.delete().catch(() => {});
+    }).catch(err => {
+      console.error("Erro ao enviar o painel:", err);
     });
   }
 
-  // 🎒 INVENTÁRIO (Sem moedas)
+  // 🎒 INVENTÁRIO
   if (cmd === "!pegar") {
     let item = args.slice(1).join(" ");
     if (!item) return message.reply("Digite o nome do item para pegar!");
@@ -84,27 +99,32 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.customId === "open_ticket") {
     await interaction.deferReply({ ephemeral: true });
 
-    const channel = await interaction.guild.channels.create({
-      name: `ticket-${interaction.user.username}`,
-      type: ChannelType.GuildText,
-      permissionOverwrites: [
-        { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-        { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
-      ]
-    });
+    try {
+      const channel = await interaction.guild.channels.create({
+        name: `ticket-${interaction.user.username}`,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+        ]
+      });
 
-    const rowTicket = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("claim_ticket").setLabel("Claim (Assumir) 🔒").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("close_ticket").setLabel("Fechar Ticket ❌").setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId("staff_panel").setLabel("Painel Staff 🛠️").setStyle(ButtonStyle.Secondary)
-    );
+      const rowTicket = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("claim_ticket").setLabel("Claim (Assumir) 🔒").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId("close_ticket").setLabel("Fechar Ticket ❌").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId("staff_panel").setLabel("Painel Staff 🛠️").setStyle(ButtonStyle.Secondary)
+      );
 
-    await channel.send({
-      content: `👋 Olá ${interaction.user}, bem-vindo ao seu ticket!\nExplique sua dúvida aqui. A equipe de suporte já foi notificada.`,
-      components: [rowTicket]
-    });
+      await channel.send({
+        content: `👋 Olá ${interaction.user}, bem-vindo ao seu ticket!\nExplique sua dúvida aqui. A equipe de suporte já foi notificada.`,
+        components: [rowTicket]
+      });
 
-    await interaction.editReply({ content: `Seu ticket foi criado com sucesso em: ${channel}` });
+      await interaction.editReply({ content: `Seu ticket foi criado com sucesso em: ${channel}` });
+    } catch (error) {
+      console.error(error);
+      await interaction.editReply({ content: "❌ Ocorreu um erro ao criar o canal do ticket. Verifique minhas permissões no servidor." });
+    }
   }
 
   // 2️⃣ CLICOU EM CLAIM (ASSUMIR)
@@ -123,7 +143,7 @@ client.on("interactionCreate", async (interaction) => {
     }, 5000);
   }
 
-  // 4️⃣ CLICOU NO PAINEL STAFF (Mensagem efêmera - só a staff vê)
+  // 4️⃣ CLICOU NO PAINEL STAFF
   if (interaction.customId === "staff_panel") {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
       return interaction.reply({ content: "❌ Erro: Esse painel é restrito para membros da Staff.", ephemeral: true });
@@ -159,7 +179,7 @@ client.on("interactionCreate", async (interaction) => {
 // Comando para a staff adicionar membros ao ticket aberto
 client.on("messageCreate", async (message) => {
   if (message.content.startsWith("!adicionar")) {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) return;
+    if (!message.member || !message.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) return;
     const user = message.mentions.users.first();
     if (!user) return message.reply("Mencione um usuário válido para adicionar.");
 
