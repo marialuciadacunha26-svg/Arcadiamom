@@ -17,7 +17,7 @@ const {
 const express = require("express");
 const fs = require("fs");
 
-// Servidor Web para o Render (Docker)
+// Servidor Web para o Render (Docker / Web Service)
 const app = express();
 app.get("/", (req, res) => res.send("Arcadiamon V3 Embeds Ativo!"));
 app.listen(process.env.PORT || 3000, () => console.log("Web server pronto."));
@@ -316,10 +316,26 @@ client.on("messageCreate", async (message) => {
     await message.channel.sendTyping();
 
     const pergunta = message.content.toLowerCase();
-    let respostaTexto = `Olá! Eu sou a inteligência artificial do Arcadiamon. Como este é um canal de suporte automático, ainda estou assimilando dados complexos. Descreva sua dúvida ou solicite um moderador se necessário utilizando os botões!`;
+    let respostaTexto = `Olá! Eu sou a inteligência artificial do Arcadiamon. Como este é um canal de suporte automático, descreva sua dúvida detalhadamente ou use os botões acima para chamar um Moderador humano!`;
 
-    if (pergunta.includes("ip") || pergunta.includes("porta") || pergunta.includes("conectar") || pergunta.includes("entrar")) {
-      respostaTexto = `Para entrar no nosso servidor de Minecraft Bedrock/MCPE utilize estes dados:\n\n📌 **IP:** \`arcadiamon.blazebr.xyz\`\n🔌 **Porta:** \`28606\``;
+    // 1️⃣ Dúvida de Como Entrar / Conectar
+    if (pergunta.includes("ip") || pergunta.includes("porta") || pergunta.includes("conectar") || pergunta.includes("entrar") || pergunta.includes("como entra")) {
+      respostaTexto = `🎮 **Como Entrar no Arcadiamon (Minecraft Bedrock/MCPE):**\n\n` +
+                      `1️⃣ Abra o seu Minecraft.\n` +
+                      `2️⃣ Vá em **Jogar** ➔ **Servidores** ➔ Clique em **Adicionar Servidor**.\n` +
+                      `3️⃣ Preencha com os dados abaixo:\n` +
+                      `• 📌 **IP / Endereço:** \`arcadiamon.blazebr.xyz\`\n` +
+                      `• 🔌 **Porta:** \`28606\`\n\n` +
+                      `Salve e clique em entrar para começar sua jornada Pokémon!`;
+    
+    // 2️⃣ Dúvida de Como Pegar as Coisas do Mod (Pokémons e Itens)
+    } else if (pergunta.includes("pegar") || pergunta.includes("mod") || pergunta.includes("pixelmon") || pergunta.includes("pokemon") || pergunta.includes("item") || pergunta.includes("como ganha") || pergunta.includes("pega")) {
+      respostaTexto = `🎒 **Como pegar itens e Pokémons do Mod:**\n\n` +
+                      `Você pode adicionar itens ou Pokémons diretamente ao seu inventário usando nosso comando de barra aqui no Discord!\n\n` +
+                      `👉 Use o comando: \`/pegar\`\n` +
+                      `• Depois digite o nome do Pokémon ou item que deseja coletar.\n\n` +
+                      `Para ver tudo o que você já coletou, use o comando: \`/inv\``;
+                      
     } else if (pergunta.includes("vip") || pergunta.includes("comprar") || pergunta.includes("loja") || pergunta.includes("kit")) {
       respostaTexto = `Para adquirir vantagens VIP, kits exclusivos ou Pokémons customizados, aguarde o suporte de um administrador da nossa equipe neste canal ou acesse nossa loja!`;
     } else if (pergunta.includes("ajuda") || pergunta.includes("bug") || pergunta.includes("erro")) {
