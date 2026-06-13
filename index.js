@@ -412,7 +412,7 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-// ================= RESPONDEDOR DA IA DENTRO DO TICKET =================
+// ================= RESPONDEDOR DA IA AVANÇADO (RESPOSTAS VARIADAS) =================
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
@@ -420,32 +420,60 @@ client.on("messageCreate", async (message) => {
     await message.channel.sendTyping();
 
     const pergunta = message.content.toLowerCase();
-    let respostaTexto = `Olá! Eu sou a inteligência artificial de suporte da **Arcadiamon**. \n\nDescreva sua dúvida detalhadamente neste chat. Se precisar de um atendente humano, basta aguardar que a nossa equipe da Staff já foi notificada através dos botões acima!`;
+    
+    // Lista de saudações aleatórias
+    const respostasPadrao = [
+      `Olá! Eu sou o assistente virtual da **Arcadiamon**. Conte-me detalhadamente o que está acontecendo para que eu possa te ajudar agora mesmo!`,
+      `Salve, treinador! Sou a IA de suporte. Pode mandar sua dúvida aqui no chat! Se o seu problema for muito complexo, a nossa Staff humana será acionada automaticamente pelos botões do topo.`,
+      `Bem-vindo ao suporte automático **Arcadiamon**! Como posso ser útil na sua jornada hoje? Descreva o seu problema abaixo.`
+    ];
+    
+    let respostaTexto = respostasPadrao[Math.floor(Math.random() * respostasPadrao.length)];
 
+    // 1️⃣ OPÇÕES DE RESPOSTAS: COMO ENTRAR
     if (pergunta.includes("ip") || pergunta.includes("porta") || pergunta.includes("conectar") || pergunta.includes("entrar") || pergunta.includes("como entra")) {
-      respostaTexto = `📡 **CENTRAL DE CONEXÃO | ARCADIAMON**\n\nPara se conectar ao nosso servidor de Minecraft Bedrock (Celular/Console/PC), siga o passo a passo abaixo:\n\n1️⃣ Inicie o seu **Minecraft Bedrock**.\n2️⃣ Clique em **Jogar** ➔ Aba **Servidores** ➔ **Adicionar Servidor**.\n3️⃣ Insira os seguintes dados de conexão:\n\n• 🌐 **IP / Endereço:** \`arcadiamon.blazebr.xyz\`\n• 🔌 **Porta:** \`28606\`\n\n4️⃣ Clique em **Salvar** e depois em **Entrar**. Pronto, você já estará no mundo Pokémon!`;
+      const variacoesEntrar = [
+        `📡 **CENTRAL DE CONEXÃO | ARCADIAMON**\n\nPara entrar no servidor de Minecraft Bedrock (Celular/Console/PC), configure estes dados:\n\n• 🌐 **IP / Endereço:** \`arcadiamon.blazebr.xyz\`\n• 🔌 **Porta:** \`28606\`\n\nAbra o jogo, vá em Servidores ➔ Adicionar Servidor, salve esses dados e clique em Entrar!`,
+        `🎮 **SESSÃO DE CONEXÃO DIRETA**\n\nQuer entrar no mundo Arcadiamon? Siga os dados abaixo no seu Minecraft Pocket Edition / Bedrock:\n\n➔ **IP:** \`arcadiamon.blazebr.xyz\`\n➔ **Porta:** \`28606\`\n\nBasta adicionar na sua aba de servidores externos e começar sua jornada!`,
+        `⚡ **CONECTE-SE AGORA NO SERVIDOR**\n\nPronto para se tornar uma lenda? Adicione o nosso servidor oficial no seu Minecraft:\n\n📌 **Endereço (IP):** \`arcadiamon.blazebr.xyz\`\n🔌 **Porta Padrão:** \`28606\`\n\nMande um print do erro aqui no chat se tiver problemas para logar!`
+      ];
+      respostaTexto = variacoesEntrar[Math.floor(Math.random() * variacoesEntrar.length)];
+    
+    // 2️⃣ OPÇÕES DE RESPOSTAS: PEGAR COISAS DO MOD / POKEPEDIA
     } else if (pergunta.includes("pegar") || pergunta.includes("mod") || pergunta.includes("pixelmon") || pergunta.includes("pokemon") || pergunta.includes("item") || pergunta.includes("como ganha") || pergunta.includes("pega") || pergunta.includes("pokepedia") || pergunta.includes("pokedex")) {
-      respostaTexto = `
-🎮 **GUIA DE INÍCIO | COMO PEGAR ITENS E USAR A POKÉPEDIA**
-
-No Arcadiamon, toda a sua jornada acontece diretamente dentro do servidor do Minecraft. Veja como resgatar seus itens e consultar a Poképédia:
-
-• 🧬 **Seu Primeiro Pokémon:** Assim que você entrar no servidor pela primeira vez, uma interface será aberta automaticamente na sua tela para você escolher o seu Pokémon Inicial.
-
-• 📦 **Kits Iniciais (Pokébolas e Itens):** Abra o chat do jogo dentro do servidor e digite o comando:
-  ➔ \`/kit\` ou \`/kit inicial\`
-  *(Isso vai colocar as suas primeiras Pokébolas e ferramentas direto no seu inventário do jogo).* • 📖 **Acessar a Poképédia / Pokédex:** Para consultar informações de qualquer Pokémon, golpes, evoluções e fraquezas dentro do jogo, abra o chat do Minecraft e digite:
-  ➔ \`/pokepedia\` ou \`/pokedex\`
-  *(Um menu interativo será aberto na sua tela com a lista completa de dados de todas as criaturas do mod).* • 🌲 **Capturando no Mapa:** Para pegar novos Pokémons, basta andar pelo mundo selvagem, encontrar o Pokémon que você quer e arremessar a sua Pokébola nele para iniciar a captura.
-
-⚠️ *Nota: Se você comprou algum pacote, VIP ou Pokémon na Loja e veio aqui resgatar, informe o seu Nick do jogo neste chat e aguarde um Diretor/Admin realizar a entrega manual.*`;
+      const variacoesJogo = [
+        `🎮 **GUIA DE JOGO | ITENS E POKÉPEDIA**\n\nNo Arcadiamon, tudo funciona direto no seu Minecraft:\n\n• 🧬 **Inicial:** Escolha seu primeiro Pokémon na interface que abre ao entrar pela primeira vez.\n• 📦 **Kits:** Digite \`/kit\` ou \`/kit inicial\` no chat do jogo para ganhar suas primeiras Pokébolas.\n• 📖 **Poképédia:** Quer ver evoluções e dados de um Pokémon? Digite \`/pokepedia\` ou \`/pokedex\` no chat do Minecraft para abrir o menu do mod.\n• 🌲 **Capturas:** Explore o mapa selvagem e jogue suas Pokébolas nos Pokémons para pegá-los!`,
+        `🎒 **MANUAL DE SOBREVIVÊNCIA POKÉMON**\n\nAprenda a pegar seus recursos dentro do nosso servidor:\n\n1️⃣ Use o comando \`/kit inicial\` no chat do servidor para resgatar ferramentas e Pokébolas.\n2️⃣ Use \`/pokepedia\` no jogo sempre que quiser ver informações de golpes, fraquezas ou evoluções das criaturas.\n3️⃣ Se você comprou itens na nossa Loja e quer resgatar, informe o seu nick do jogo aqui no ticket e aguarde um Administrador!`,
+        `🧬 **DICAS DE INÍCIO | ARCADIAMON MOD**\n\nPara evoluir rápido e coletar itens no servidor do Minecraft, utilize os comandos do chat in-game:\n\n➔ \`/kit\` para coletar seus itens grátis de treinador.\n➔ \`/pokepedia\` para abrir a enciclopédia oficial de evolução Pokémon dentro do próprio jogo.\n\nTodos os Pokémons selvagens do mapa podem ser capturados batalhando e jogando Pokébolas neles!`
+      ];
+      respostaTexto = variacoesJogo[Math.floor(Math.random() * variacoesJogo.length)];
+      
+    // 3️⃣ OPÇÕES DE RESPOSTAS: LOJA / VIP
     } else if (pergunta.includes("vip") || pergunta.includes("comprar") || pergunta.includes("loja") || pergunta.includes("kit")) {
-      respostaTexto = `🛒 **LOJA E VANTAGENS VIP**\n\nPara adquirir vantagens VIP, kits exclusivos, insígnias ou Pokémons customizados, aguarde o suporte de um administrador da nossa equipe neste canal ou consulte as instruções na nossa categoria de anúncios!`;
+      const variacoesLoja = [
+        `🛒 **LOJA E VANTAGENS VIP**\n\nInteressado em adquirir pacotes de moedas, kits exclusivos, insígnias ou Pokémons customizados? Acesse a nossa aba de anúncios do Discord ou aguarde um Diretor aqui neste ticket para te passar os valores e formas de pagamento!`,
+        `💵 **SUPORTE FINANCEIRO E LOJA**\n\nPara compras de VIP ou Pokémons na nossa loja, por favor informe o seu Nick do Minecraft aqui no chat. Assim que um administrador ficar online, ele fará o seu atendimento manual.`
+      ];
+      respostaTexto = variacoesLoja[Math.floor(Math.random() * variacoesLoja.length)];
+
+    // 4️⃣ OPÇÕES DE RESPOSTAS: BUGS E ERROS
     } else if (pergunta.includes("ajuda") || pergunta.includes("bug") || pergunta.includes("erro")) {
-      respostaTexto = `🔺 **REPORTE DE ERROS E BUGS**\n\nLamentamos pelo transtorno! Para que nossa equipe técnica resolva o seu problema o quanto antes, envie neste chat:\n\n1️⃣ Seu Nick no jogo.\n2️⃣ Uma breve explicação do bug.\n3️⃣ Prints ou vídeos do erro acontecendo (se houver).`;
+      const variacoesBugs = [
+        `🔺 **CENTRAL DE ERROS E REPORTE**\n\nEncontrou uma falha ou bug no jogo? Ajude nossa equipe técnica a resolver enviando:\n\n1️⃣ Seu Nick exato no jogo.\n2️⃣ O que aconteceu de errado.\n3️⃣ Mande fotos ou vídeos do bug aqui no chat (se tiver).`,
+        `🔧 **ÁREA TÉCNICA | REPORTAR FALHAS**\n\nLamentamos o transtorno! Para solucionarmos o seu problema o mais rápido possível, descreva o bug detalhadamente e anexe provas visuais aqui neste canal privado.`
+      ];
+      respostaTexto = variacoesBugs[Math.floor(Math.random() * variacoesBugs.length)];
     }
 
-    await message.reply({ embeds: [new EmbedBuilder().setTitle("🤖 Suporte Automatizado Arcadiamon").setDescription(respostaTexto).setColor("#ffcc00").setFooter({ text: "Arcadiamon • Sistema de Respostas Rápidas" })] });
+    await message.reply({ 
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("🤖 Suporte Automatizado Arcadiamon")
+          .setDescription(respostaTexto)
+          .setColor("#ffcc00")
+          .setFooter({ text: "Arcadiamon • Respostas Dinâmicas Inteligentes" })
+      ] 
+    });
   }
 });
 
