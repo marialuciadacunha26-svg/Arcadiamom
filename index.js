@@ -63,7 +63,15 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("inv")
-    .setDescription("Mostra o seu inventário de itens do Discord.")
+    .setDescription("Mostra o seu inventário de itens do Discord."),
+
+  new SlashCommandBuilder()
+    .setName("trocar")
+    .setDescription("Inicia uma proposta de troca avançada com outro jogador.")
+    .addUserOption(option => 
+      option.setName("usuario")
+        .setDescription("Selecione o jogador com quem deseja negociar")
+        .setRequired(true))
 ].map(command => command.toJSON());
 
 client.on("ready", async () => {
@@ -181,9 +189,44 @@ client.on("interactionCreate", async (interaction) => {
 
     await interaction.reply({ embeds: [embedInv] });
   }
+
+  // 🔄 /trocar (SISTEMA DE TROCA AVANÇADO)
+  if (commandName === "trocar") {
+    const alvo = interaction.options.getUser("usuario");
+    if (!alvo) return interaction.reply({ content: "❌ Você precisa mencionar um jogador para trocar.", ephemeral: true });
+    if (alvo.id === interaction.user.id) return interaction.reply({ content: "❌ Você não pode trocar com você mesmo.", ephemeral: true });
+    if (alvo.bot) return interaction.reply({ content: "❌ Você não pode trocar com um bot.", ephemeral: true });
+
+    const invAutor = db.inventory[interaction.user.id] || [];
+    if (invAutor.length === 0) return interaction.reply({ content: "❌ Seu inventário está vazio. Você não tem nada para oferecer!", ephemeral: true });
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`troca_oferecer_${interaction.user.id}_${alvo.id}`)
+      .setPlaceholder("🎁 Selecione o item que você deseja oferecer")
+      .setMaxValues(1);
+
+    invAutor.slice(0, 25).forEach((item, index) => {
+      selectMenu.addOptions(
+        new StringSelectMenuOptionBuilder()
+          .setLabel(item)
+          .setValue(`${item}_${index}`)
+          .setEmoji("📦")
+      );
+    });
+
+    const rowMenu = new ActionRowBuilder().addComponents(selectMenu);
+
+    const embedProposta = new EmbedBuilder()
+      .setTitle("🔄 Proposta de Troca Iniciada")
+      .setDescription(`Olá ${alvo}! O jogador ${interaction.user} quer iniciar uma troca avançada com você.\n\n**Passo 1:** ${interaction.user} deve selecionar o item que vai oferecer no menu abaixo.`)
+      .setColor("#ffcc00")
+      .setFooter({ text: "Arcadiamon • Sistema de Trocas Seguras" });
+
+    await interaction.reply({ content: `${alvo}`, embeds: [embedProposta], components: [rowMenu] });
+  }
 });
 
-// ================= PROCESSANDO A SELEÇÃO DO MENU =================
+// ================= PROCESSANDO A SELEÇÃO DO MENU DE TICKETS =================
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isStringSelectMenu()) return;
 
@@ -243,68 +286,129 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-// ================= INTERAÇÕES DOS BOTÕES INTERNOS DOS TICKETS =================
+// ================= INTERAÇÕES INTERNAS DOS COMPONENTES DE TROCA E TICKETS =================
+const trocasAtivas = new Map();
+
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isButton()) return;
+  // --- PARTE 1: SELEÇÃO DE ITENS DA TROCA ---
+  if (interaction.isStringSelectMenu() && interaction.customId.startsWith("troca_oferecer_")) {
+    const [,, autorId, alvoId] = interaction.customId.split("_");
+    if (interaction.user.id !== autorId) return interaction.reply({ content: "❌ Apenas quem iniciou a troca pode selecionar o item.", ephemeral: true });
 
-  if (interaction.customId === "claim_ticket") {
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-      return interaction.reply({ content: "Apenas membros da Staff podem assumir este ticket!", ephemeral: true });
+    const itemNome = interaction.values[0].split("_")[0];
+    trocasAtivas.set(`${autorId}_${alvoId}`, { itemAutor: itemNome, itemAlvo: null, confirmouAutor: false, confirmouAlvo: false });
+
+    const invAlvo = db.inventory[alvoId] || [];
+    if (invAlvo.length === 0) {
+      const botoesConfirmacao = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`troca_b_aceitar_${autorId}_${alvoId}`).setLabel("Aceitar Troca ✅").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`troca_b_recusar_${autorId}_${alvoId}`).setLabel("Recusar Troca ❌").setStyle(ButtonStyle.Danger)
+      );
+      const embedSemItens = new EmbedBuilder()
+        .setTitle("🔄 Confirmação de Troca (Doação)")
+        .setDescription(`👤 **Doador:** <@${autorId}> envia: **${itemNome}**\n👤 **Recebedor:** <@${alvoId}> *(Não possui itens)*\n\nAmbos precisam clicar em **Aceitar Troca**!`)
+        .setColor("#ffcc00");
+      return interaction.update({ embeds: [embedSemItens], components: [botoesConfirmacao] });
     }
-    const embedClaim = new EmbedBuilder()
-      .setDescription(`🚨 O moderador ${interaction.user} assumiu o atendimento deste ticket!`)
-      .setColor("#e67e22");
-    await interaction.reply({ embeds: [embedClaim] });
+
+    const selectMenuAlvo = new StringSelectMenuBuilder().setCustomId(`troca_contraproposta_${autorId}_${alvoId}`).setPlaceholder("🎁 Selecione o item que você dará em troca").setMaxValues(1);
+    invAlvo.slice(0, 25).forEach((item, index) => {
+      selectMenuAlvo.addOptions(new StringSelectMenuOptionBuilder().setLabel(item).setValue(`${item}_${index}`).setEmoji("📦"));
+    });
+
+    await interaction.update({ embeds: [new EmbedBuilder().setTitle("🔄 Troca - Contraproposta").setDescription(`👤 <@${autorId}> ofereceu: **${itemNome}**\n\n**Passo 2:** <@${alvoId}>, selecione sua contraproposta no menu abaixo.`).setColor("#ffcc00")], components: [new ActionRowBuilder().addComponents(selectMenuAlvo)] });
   }
 
-  if (interaction.customId === "close_ticket") {
-    const embedClose = new EmbedBuilder()
-      .setDescription("🔒 Canal marcado para encerramento. Deletando este ticket em 5 segundos...")
-      .setColor("#e74c3c");
-    
-    await interaction.reply({ embeds: [embedClose] });
-    
-    if (db.ai_tickets[interaction.channel.id]) {
-      delete db.ai_tickets[interaction.channel.id];
-      saveDB();
-    }
+  if (interaction.isStringSelectMenu() && interaction.customId.startsWith("troca_contraproposta_")) {
+    const [,, autorId, alvoId] = interaction.customId.split("_");
+    if (interaction.user.id !== alvoId) return interaction.reply({ content: "❌ Apenas o jogador desafiado pode contrapropor.", ephemeral: true });
 
-    setTimeout(() => {
-      interaction.channel.delete().catch(() => {});
-    }, 5000);
-  }
+    const dadosTroca = trocasAtivas.get(`${autorId}_${alvoId}`);
+    if (!dadosTroca) return interaction.reply({ content: "❌ Sessão de troca inválida.", ephemeral: true });
 
-  if (interaction.customId === "staff_panel") {
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-      return interaction.reply({ content: "❌ Apenas a Staff pode abrir este painel.", ephemeral: true });
-    }
+    dadosTroca.itemAlvo = interaction.values[0].split("_")[0];
 
-    const rowStaff = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("staff_add_user").setLabel("Adicionar Usuário 👤").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("staff_renomear").setLabel("Renomear Canal 📝").setStyle(ButtonStyle.Secondary)
+    const botoesConfirmacao = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`troca_b_aceitar_${autorId}_${alvoId}`).setLabel("Aceitar Troca ✅").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`troca_b_recusar_${autorId}_${alvoId}`).setLabel("Recusar Troca ❌").setStyle(ButtonStyle.Danger)
     );
 
-    const embedStaff = new EmbedBuilder()
-      .setTitle("🛠️ Painel de Controle Staff")
-      .setDescription("Selecione uma das funções administrativas para gerenciar este ticket:")
-      .setColor("#2c3e50");
-
-    await interaction.reply({ embeds: [embedStaff], components: [rowStaff], ephemeral: true });
+    await interaction.update({ embeds: [new EmbedBuilder().setTitle("🤝 Revisão Final da Troca").setDescription(`Analise os termos antes de confirmar:\n\n🟢 **Oferta de <@${autorId}>:** \`${dadosTroca.itemAutor}\`\n🔵 **Oferta de <@${alvoId}>:** \`${dadosTroca.itemAlvo}\`\n\n*Clique em Aceitar Troca para validar!*`).setColor("#3498db")], components: [botoesConfirmacao] });
   }
 
-  if (interaction.customId === "staff_add_user") {
-    const embedDica = new EmbedBuilder()
-      .setDescription("💡 Para adicionar um jogador neste canal de ticket, use:\n`!adicionar @usuario`")
-      .setColor("#34495e");
-    await interaction.reply({ embeds: [embedDica], ephemeral: true });
+  // --- PARTE 2: BOTÕES DE CONFIRMAÇÃO DA TROCA ---
+  if (interaction.isButton() && interaction.customId.startsWith("troca_b_")) {
+    const [,,, acao, autorId, alvoId] = interaction.customId.split("_");
+    if (interaction.user.id !== autorId && interaction.user.id !== alvoId) return interaction.reply({ content: "❌ Você não faz parte desta troca.", ephemeral: true });
+
+    if (acao === "recusar") {
+      trocasAtivas.delete(`${autorId}_${alvoId}`);
+      return interaction.update({ embeds: [new EmbedBuilder().setDescription(`❌ A troca entre <@${autorId}> e <@${alvoId}> foi cancelada.`).setColor("#e74c3c")], components: [] });
+    }
+
+    if (acao === "aceitar") {
+      const dadosTroca = trocasAtivas.get(`${autorId}_${alvoId}`);
+      if (!dadosTroca) return interaction.reply({ content: "❌ Erro ao processar a troca.", ephemeral: true });
+
+      if (interaction.user.id === autorId) dadosTroca.confirmouAutor = true;
+      if (interaction.user.id === alvoId) dadosTroca.confirmouAlvo = true;
+
+      if (!dadosTroca.confirmouAutor || !dadosTroca.confirmouAlvo) {
+        return interaction.reply({ content: `⏳ ${interaction.user} aceitou! Aguardando o outro jogador...`, ephemeral: false });
+      }
+
+      let invAutor = db.inventory[autorId] || [];
+      let invAlvo = db.inventory[alvoId] || [];
+
+      const idxA = invAutor.indexOf(dadosTroca.itemAutor);
+      if (idxA > -1) invAutor.splice(idxA, 1);
+      invAlvo.push(dadosTroca.itemAutor);
+
+      if (dadosTroca.itemAlvo) {
+        const idxB = invAlvo.indexOf(dadosTroca.itemAlvo);
+        if (idxB > -1) invAlvo.splice(idxB, 1);
+        invAutor.push(dadosTroca.itemAlvo);
+      }
+
+      db.inventory[autorId] = invAutor;
+      db.inventory[alvoId] = invAlvo;
+      saveDB();
+      trocasAtivas.delete(`${autorId}_${alvoId}`);
+
+      await interaction.update({ embeds: [new EmbedBuilder().setTitle("🎉 TROCA CONCLUÍDA!").setDescription(`📦 <@${autorId}> recebeu: \`${dadosTroca.itemAlvo || "Nenhum"}\`\n📦 <@${alvoId}> recebeu: \`${dadosTroca.itemAutor}\``).setColor("#2ecc71")], components: [] });
+    }
   }
 
-  if (interaction.customId === "staff_renomear") {
-    await interaction.channel.setName(`resolvido-${interaction.channel.name.split("-")[1] || ""}`);
-    const embedRenomeado = new EmbedBuilder()
-      .setDescription("✅ Nome do canal alterado com sucesso para resolvido!")
-      .setColor("#2ecc71");
-    await interaction.reply({ embeds: [embedRenomeado], ephemeral: true });
+  // --- PARTE 3: GERENCIAMENTO DOS BOTÕES DOS TICKETS ---
+  if (interaction.isButton() && !interaction.customId.startsWith("troca_b_")) {
+    if (interaction.customId === "claim_ticket") {
+      if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) return interaction.reply({ content: "Apenas Staff pode assumir este ticket!", ephemeral: true });
+      await interaction.reply({ embeds: [new EmbedBuilder().setDescription(`🚨 O moderador ${interaction.user} assumiu este ticket!`).setColor("#e67e22")] });
+    }
+
+    if (interaction.customId === "close_ticket") {
+      await interaction.reply({ embeds: [new EmbedBuilder().setDescription("🔒 Canal marcado para encerramento em 5 segundos...").setColor("#e74c3c")] });
+      if (db.ai_tickets[interaction.channel.id]) { delete db.ai_tickets[interaction.channel.id]; saveDB(); }
+      setTimeout(() => { interaction.channel.delete().catch(() => {}); }, 5000);
+    }
+
+    if (interaction.customId === "staff_panel") {
+      if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) return interaction.reply({ content: "❌ Apenas a Staff pode abrir este painel.", ephemeral: true });
+      const rowStaff = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("staff_add_user").setLabel("Adicionar Usuário 👤").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId("staff_renomear").setLabel("Renomear Canal 📝").setStyle(ButtonStyle.Secondary)
+      );
+      await interaction.reply({ embeds: [new EmbedBuilder().setTitle("🛠️ Painel Staff").setDescription("Selecione uma função administrativa:").setColor("#2c3e50")], components: [rowStaff], ephemeral: true });
+    }
+
+    if (interaction.customId === "staff_add_user") {
+      await interaction.reply({ embeds: [new EmbedBuilder().setDescription("💡 Para adicionar um jogador use: `!adicionar @usuario`").setColor("#34495e")], ephemeral: true });
+    }
+
+    if (interaction.customId === "staff_renomear") {
+      await interaction.channel.setName(`resolvido-${interaction.channel.name.split("-")[1] || ""}`);
+      await interaction.reply({ embeds: [new EmbedBuilder().setDescription("✅ Canal renomeado para resolvido!").setColor("#2ecc71")], ephemeral: true });
+    }
   }
 });
 
@@ -318,44 +422,30 @@ client.on("messageCreate", async (message) => {
     const pergunta = message.content.toLowerCase();
     let respostaTexto = `Olá! Eu sou a inteligência artificial de suporte da **Arcadiamon**. \n\nDescreva sua dúvida detalhadamente neste chat. Se precisar de um atendente humano, basta aguardar que a nossa equipe da Staff já foi notificada através dos botões acima!`;
 
-    // 1️⃣ COMO ENTRAR NO SERVIDOR (PADRÃO GAMEZONE)
     if (pergunta.includes("ip") || pergunta.includes("porta") || pergunta.includes("conectar") || pergunta.includes("entrar") || pergunta.includes("como entra")) {
-      respostaTexto = `📡 **CENTRAL DE CONEXÃO | ARCADIAMON**\n\n` +
-                      `Para se conectar ao nosso servidor de Minecraft Bedrock (Celular/Console/PC), siga o passo a passo abaixo:\n\n` +
-                      `1️⃣ Inicie o seu **Minecraft Bedrock**.\n` +
-                      `2️⃣ Clique em **Jogar** ➔ Aba **Servidores** ➔ **Adicionar Servidor**.\n` +
-                      `3️⃣ Insira os seguintes dados de conexão:\n\n` +
-                      `• 🌐 **IP / Endereço:** \`arcadiamon.blazebr.xyz\`\n` +
-                      `• 🔌 **Porta:** \`28606\`\n\n` +
-                      `4️⃣ Clique em **Salvar** e depois em **Entrar**. Pronto, você já estará no mundo Pokémon!`;
-    
-    // 2️⃣ COMO PEGAR AS COISAS DO MOD / POKEPEDIA DENTRO DO JOGO (PADRÃO GAMEZONE)
+      respostaTexto = `📡 **CENTRAL DE CONEXÃO | ARCADIAMON**\n\nPara se conectar ao nosso servidor de Minecraft Bedrock (Celular/Console/PC), siga o passo a passo abaixo:\n\n1️⃣ Inicie o seu **Minecraft Bedrock**.\n2️⃣ Clique em **Jogar** ➔ Aba **Servidores** ➔ **Adicionar Servidor**.\n3️⃣ Insira os seguintes dados de conexão:\n\n• 🌐 **IP / Endereço:** \`arcadiamon.blazebr.xyz\`\n• 🔌 **Porta:** \`28606\`\n\n4️⃣ Clique em **Salvar** e depois em **Entrar**. Pronto, você já estará no mundo Pokémon!`;
     } else if (pergunta.includes("pegar") || pergunta.includes("mod") || pergunta.includes("pixelmon") || pergunta.includes("pokemon") || pergunta.includes("item") || pergunta.includes("como ganha") || pergunta.includes("pega") || pergunta.includes("pokepedia") || pergunta.includes("pokedex")) {
-      respostaTexto = `🎮 **GUIA DE INÍCIO | COMO PEGAR ITENS E USAR A POKÉPEDIA**\n\n` +
-                      `No Arcadiamon, toda a sua jornada acontece diretamente dentro do servidor do Minecraft. Veja como resgatar seus itens e consultar a Poképédia:\n\n` +
-                      `• 🧬 **Seu Primeiro Pokémon:** Assim que você entrar no servidor pela primeira vez, uma interface será aberta automaticamente na sua tela para você escolher o seu Pokémon Inicial.\n\n` +
-                      `• 📦 **Kits Iniciais (Pokébolas e Itens):** Abra o chat do jogo dentro do servidor e digite o comando:\n` +
-                      `  ➔ \`/kit\` ou \`/kit inicial\`\n` +
-                      `  *(Isso vai colocar as suas primeiras Pokébolas e ferramentas direto no seu inventário do jogo).* \n\n` +
-                      `• 📖 **Acessar a Poképédia / Pokédex:** Para consultar informações de qualquer Pokémon, golpes, evoluções e fraquezas dentro do jogo, abra o chat do Minecraft e digite:\n` +
-                      `  ➔ \`/pokepedia\` ou \`/pokedex\`\n` +
-                      `  *(Um menu interativo será aberto na sua tela com a lista completa de dados de todas as criaturas do mod).* \n\n` +
-                      `• 🌲 **Capturando no Mapa:** Para pegar novos Pokémons, basta andar pelo mundo selvagem, encontrar o Pokémon que você quer e arremessar a sua Pokébola nele para iniciar a captura.\n\n` +
-                      `⚠️ *Nota: Se você comprou algum pacote, VIP ou Pokémon na Loja e veio aqui resgatar, informe o seu Nick do jogo neste chat e aguarde um Diretor/Admin realizar a entrega manual.*`;
-                      
+      respostaTexto = `
+🎮 **GUIA DE INÍCIO | COMO PEGAR ITENS E USAR A POKÉPEDIA**
+
+No Arcadiamon, toda a sua jornada acontece diretamente dentro do servidor do Minecraft. Veja como resgatar seus itens e consultar a Poképédia:
+
+• 🧬 **Seu Primeiro Pokémon:** Assim que você entrar no servidor pela primeira vez, uma interface será aberta automaticamente na sua tela para você escolher o seu Pokémon Inicial.
+
+• 📦 **Kits Iniciais (Pokébolas e Itens):** Abra o chat do jogo dentro do servidor e digite o comando:
+  ➔ \`/kit\` ou \`/kit inicial\`
+  *(Isso vai colocar as suas primeiras Pokébolas e ferramentas direto no seu inventário do jogo).* • 📖 **Acessar a Poképédia / Pokédex:** Para consultar informações de qualquer Pokémon, golpes, evoluções e fraquezas dentro do jogo, abra o chat do Minecraft e digite:
+  ➔ \`/pokepedia\` ou \`/pokedex\`
+  *(Um menu interativo será aberto na sua tela com a lista completa de dados de todas as criaturas do mod).* • 🌲 **Capturando no Mapa:** Para pegar novos Pokémons, basta andar pelo mundo selvagem, encontrar o Pokémon que você quer e arremessar a sua Pokébola nele para iniciar a captura.
+
+⚠️ *Nota: Se você comprou algum pacote, VIP ou Pokémon na Loja e veio aqui resgatar, informe o seu Nick do jogo neste chat e aguarde um Diretor/Admin realizar a entrega manual.*`;
     } else if (pergunta.includes("vip") || pergunta.includes("comprar") || pergunta.includes("loja") || pergunta.includes("kit")) {
       respostaTexto = `🛒 **LOJA E VANTAGENS VIP**\n\nPara adquirir vantagens VIP, kits exclusivos, insígnias ou Pokémons customizados, aguarde o suporte de um administrador da nossa equipe neste canal ou consulte as instruções na nossa categoria de anúncios!`;
     } else if (pergunta.includes("ajuda") || pergunta.includes("bug") || pergunta.includes("erro")) {
       respostaTexto = `🔺 **REPORTE DE ERROS E BUGS**\n\nLamentamos pelo transtorno! Para que nossa equipe técnica resolva o seu problema o quanto antes, envie neste chat:\n\n1️⃣ Seu Nick no jogo.\n2️⃣ Uma breve explicação do bug.\n3️⃣ Prints ou vídeos do erro acontecendo (se houver).`;
     }
 
-    const embedIa = new EmbedBuilder()
-      .setTitle("🤖 Suporte Automatizado Arcadiamon")
-      .setDescription(respostaTexto)
-      .setColor("#ffcc00")
-      .setFooter({ text: "Arcadiamon • Sistema de Respostas Rápidas" });
-
-    await message.reply({ embeds: [embedIa] });
+    await message.reply({ embeds: [new EmbedBuilder().setTitle("🤖 Suporte Automatizado Arcadiamon").setDescription(respostaTexto).setColor("#ffcc00").setFooter({ text: "Arcadiamon • Sistema de Respostas Rápidas" })] });
   }
 });
 
@@ -367,12 +457,7 @@ client.on("messageCreate", async (message) => {
     if (!user) return message.reply("Mencione o usuário que você quer adicionar.");
     
     await message.channel.permissionOverwrites.create(user.id, { ViewChannel: true, SendMessages: true });
-    
-    const embedAdicionado = new EmbedBuilder()
-      .setDescription(`✅ O jogador ${user} foi adicionado com sucesso ao ticket.`)
-      .setColor("#2ecc71");
-
-    message.channel.send({ embeds: [embedAdicionado] });
+    message.channel.send({ embeds: [new EmbedBuilder().setDescription(`✅ O jogador ${user} foi adicionado com sucesso ao ticket.`).setColor("#2ecc71")] });
   }
 });
 
